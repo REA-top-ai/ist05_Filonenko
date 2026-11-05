@@ -49,37 +49,47 @@ int main(const int argc, char** argv) {
     int offset = bitwiseShift_32(headers, 10);
     int width = bitwiseShift_32(headers, 18);
     int height = bitwiseShift_32(headers, 22);
+    int bpp = bitwiseShift_16(headers, 28);
     int compression = bitwiseShift_32(headers, 30);
     
-    int row_size = width * 2;
+    int row_size = width * bpp / 8;
     if (row_size % 4 != 0) { 
         row_size += 2; 
     }  
 
     std::ifstream file(path, std::ios::binary);
-    if (!file) { return 1; }
+    if (!file) { 
+        return 1; 
+    }
 
     int xs[4] = {0, width - 1, 0, width - 1};
     int ys[4] = {0, 0, height - 1, height - 1};
 
     for (int i = 0; i < 4; i++) {
-        unsigned char p[2];
+        unsigned char p[3];
 
-        file.seekg(offset + ys[i] * row_size + xs[i] * 2);
-        file.read(reinterpret_cast<char*>(p), 2);
+        file.seekg(offset + ys[i] * row_size + xs[i] * (bpp / 8));
+        file.read(reinterpret_cast<char*>(p), (bpp / 8));
 
-        int pixel = p[0] | p[1] << 8;
         int r, g, b;
 
-        if (compression == 3) {                    
-            r = (pixel >> 11) * 255 / 31;
-            g = ((pixel >> 5) & 63) * 255 / 63;
-            b = (pixel & 31) * 255 / 31;
-        } 
-        else {                                  
-            r = ((pixel >> 10) & 31) * 255 / 31;
-            g = ((pixel >> 5) & 31) * 255 / 31;
-            b = (pixel & 31) * 255 / 31;
+        if (bpp == 16) {
+            int pixel = p[0] | p[1] << 8;
+            if (compression == 3) {                    
+                r = (pixel >> 11) * 255 / 31;
+                g = ((pixel >> 5) & 63) * 255 / 63;
+                b = (pixel & 31) * 255 / 31;
+            } 
+            else {                                  
+                r = ((pixel >> 10) & 31) * 255 / 31;
+                g = ((pixel >> 5) & 31) * 255 / 31;
+                b = (pixel & 31) * 255 / 31;
+            }
+        }
+        else if (bpp == 24) {
+            b = p[0]; 
+            g = p[1]; 
+            r = p[2];
         }
 
         if(i == 0) {
